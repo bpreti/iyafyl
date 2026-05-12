@@ -11,23 +11,33 @@ import type {
 
 // ── Teams ────────────────────────────────────────────────────────────────────
 
-/** All teams, each with their current team name joined in. */
+/** All teams, each with their current (or last known) team name joined in. */
 export async function getTeams(): Promise<TeamWithCurrentName[]> {
   const rows = await sql`
     SELECT t.*, tn.name AS current_name
     FROM teams t
-    LEFT JOIN team_names tn ON tn.team_id = t.id AND tn.end_year IS NULL
+    LEFT JOIN LATERAL (
+      SELECT name FROM team_names
+      WHERE team_id = t.id
+      ORDER BY end_year DESC NULLS FIRST
+      LIMIT 1
+    ) tn ON true
     ORDER BY t.id
   `
   return rows as TeamWithCurrentName[]
 }
 
-/** Single team by URL slug, with current name joined. */
+/** Single team by URL slug, with current (or last known) name joined. */
 export async function getTeamBySlug(slug: string): Promise<TeamWithCurrentName | null> {
   const rows = await sql`
     SELECT t.*, tn.name AS current_name
     FROM teams t
-    LEFT JOIN team_names tn ON tn.team_id = t.id AND tn.end_year IS NULL
+    LEFT JOIN LATERAL (
+      SELECT name FROM team_names
+      WHERE team_id = t.id
+      ORDER BY end_year DESC NULLS FIRST
+      LIMIT 1
+    ) tn ON true
     WHERE t.slug = ${slug}
   `
   return (rows[0] as TeamWithCurrentName) ?? null
@@ -179,7 +189,7 @@ export async function getSeasonAwards(seasonId?: number): Promise<SeasonAward[]>
 
 // ── Pure JS Helpers ───────────────────────────────────────────────────────────
 
-/** Look up the current display name for a team from a pre-fetched teams array. */
+/** Look up the current (or last known) name for a team from a pre-fetched teams array. */
 export function getTeamCurrentName(
   teamId: number,
   teams: TeamWithCurrentName[]
