@@ -3,43 +3,55 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Trophy, Shield } from 'lucide-react'
 import {
-  teams, getTeamBySlug, getTeamNamesById, getTeamSeasonsById,
-  getPlayoffResultsByTeamId, computeCareerStats,
-} from '@/lib/placeholder-data'
+  getTeams, getTeamBySlug, getTeamNamesForTeam, getTeamDetailData, computeCareerStats,
+} from '@/lib/queries'
 import StatCard from '@/components/StatCard'
+import type { PlayoffResultType } from '@/types'
 
-export function generateStaticParams() {
+export async function generateStaticParams() {
+  const teams = await getTeams()
   return teams.map(t => ({ slug: t.slug }))
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
-  const team = getTeamBySlug(slug)
+  const team = await getTeamBySlug(slug)
   if (!team) return { title: 'Team Not Found' }
   return { title: team.owner_name }
 }
 
-const resultLabel: Record<string, { label: string; className: string }> = {
-  champion:         { label: '🏆 Champion',      className: 'badge badge-champion' },
-  runner_up:        { label: '🥈 Runner-Up',     className: 'badge badge-runner-up' },
-  third:            { label: '🥉 3rd Place',     className: 'badge badge-third' },
-  fourth:           { label: '4th Place',         className: 'badge' },
-  first_round_exit: { label: 'First Round Exit',  className: 'badge' },
+const resultLabel: Record<PlayoffResultType, { label: string; className: string }> = {
+  champion:        { label: '🏆 Champion',        className: 'badge badge-champion' },
+  runner_up:       { label: '🥈 Runner-Up',        className: 'badge badge-runner-up' },
+  third:           { label: '🥉 3rd Place',        className: 'badge badge-third' },
+  fourth:          { label: '4th Place',           className: 'badge' },
+  fifth:           { label: '5th Place',           className: 'badge' },
+  sixth:           { label: '6th Place',           className: 'badge' },
+  first_round_exit:{ label: 'First Round Exit',   className: 'badge' },
+  sucko_winner:    { label: '💀 Sucko Champ',      className: 'badge badge-defunct' },
+  sucko_runner_up: { label: 'Sucko Runner-Up',    className: 'badge' },
+  sucko_exit:      { label: 'Sucko Bowl',         className: 'badge' },
 }
 
 export default async function TeamDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const team = getTeamBySlug(slug)
+  const team = await getTeamBySlug(slug)
   if (!team) notFound()
 
-  const names = getTeamNamesById(team.id)
-  const seasonStats = getTeamSeasonsById(team.id).sort((a, b) => b.season.year - a.season.year)
-  const playoffRes = getPlayoffResultsByTeamId(team.id).sort((a, b) => b.season.year - a.season.year)
-  const career = computeCareerStats(team.id)
+  const [names, { teamSeasons, playoffResults }] = await Promise.all([
+    getTeamNamesForTeam(team.id),
+    getTeamDetailData(team.id),
+  ])
+
+  const career = computeCareerStats(team.id, teamSeasons, playoffResults)
 
   const currentName = names.find(n => n.end_year === null)?.name ?? names[names.length - 1]?.name ?? team.owner_name
   const previousNames = names.filter(n => n.end_year !== null)
   const initials = team.owner_name.slice(0, 2).toUpperCase()
+
+  // Split by bracket
+  const winnersResults = playoffResults.filter(pr => pr.bracket === 'winners')
+  const suckoResults   = playoffResults.filter(pr => pr.bracket === 'sucko')
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
@@ -100,17 +112,17 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ slu
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <StatCard label="Record" value={`${career.wins}-${career.losses}${career.ties > 0 ? `-${career.ties}` : ''}`} sub={`${career.winPct} win%`} />
           <StatCard label="Points/Game" value={career.ppg} sub="career average" accent />
-          <StatCard label="Points For"  value={Number(career.pointsFor).toLocaleString()} />
+          <StatCard label="Points For"     value={Number(career.pointsFor).toLocaleString()} />
           <StatCard label="Points Against" value={Number(career.pointsAgainst).toLocaleString()} />
-          <StatCard label="Championships" value={career.championships} accent={career.championships > 0} />
+          <StatCard label="Championships"       value={career.championships} accent={career.championships > 0} />
           <StatCard label="Playoff Appearances" value={career.playoffAppearances} />
-          <StatCard label="Playoff Record" value={career.playoffRecord} />
-          <StatCard label="Seasons Played" value={seasonStats.length} />
+          <StatCard label="Playoff Record"      value={career.playoffRecord} />
+          <StatCard label="Seasons Played"      value={teamSeasons.length} />
         </div>
       </section>
 
-      {/* Playoff History */}
-      {playoffRes.length > 0 && (
+      {/* Winners Bracket Playoff History */}
+      {winnersResults.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Trophy size={18} style={{ color: 'var(--gold)' }} />
@@ -125,11 +137,42 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ slu
                 </tr>
               </thead>
               <tbody>
-                {playoffRes.map(pr => {
+                {winnersResults.map(pr => {
                   const info = resultLabel[pr.result] ?? { label: pr.result, className: 'badge' }
                   return (
                     <tr key={pr.id}>
-                      <td className="font-medium">{pr.season.year}</td>
+                      <td className="font-medium">{pr.season_year}</td>
+                      <td><span className={info.className}>{info.label}</span></td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Sucko Bowl History */}
+      {suckoResults.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">💀</span>
+            <h2 className="text-xl font-bold">Sucko Bowl History</h2>
+          </div>
+          <div className="card overflow-hidden">
+            <table>
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                {suckoResults.map(pr => {
+                  const info = resultLabel[pr.result] ?? { label: pr.result, className: 'badge' }
+                  return (
+                    <tr key={pr.id}>
+                      <td className="font-medium">{pr.season_year}</td>
                       <td><span className={info.className}>{info.label}</span></td>
                     </tr>
                   )
@@ -141,7 +184,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ slu
       )}
 
       {/* Season-by-Season */}
-      {seasonStats.length > 0 && (
+      {teamSeasons.length > 0 && (
         <section className="space-y-4">
           <h2 className="text-xl font-bold">Season-by-Season</h2>
           <div className="card overflow-x-auto">
@@ -157,9 +200,9 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ slu
                 </tr>
               </thead>
               <tbody>
-                {seasonStats.map(ts => (
+                {teamSeasons.map(ts => (
                   <tr key={ts.id}>
-                    <td className="font-medium">{ts.season.year}</td>
+                    <td className="font-medium">{ts.season_year}</td>
                     <td>{ts.wins}-{ts.losses}{ts.ties > 0 ? `-${ts.ties}` : ''}</td>
                     <td>{Number(ts.points_for).toLocaleString()}</td>
                     <td>{Number(ts.points_against).toLocaleString()}</td>

@@ -8,6 +8,7 @@ export interface Team {
   is_founder: boolean
   logo_url: string | null
   current_name?: string
+  ended_year: number | null
 }
 
 export interface TeamName {
@@ -36,15 +37,32 @@ export interface TeamSeason {
   made_playoffs: boolean
   team?: Team
   season?: Season
+  season_year?: number
 }
+
+export type PlayoffResultType =
+  | 'champion'
+  | 'runner_up'
+  | 'third'
+  | 'fourth'
+  | 'fifth'
+  | 'sixth'
+  | 'first_round_exit'
+  | 'sucko_winner'
+  | 'sucko_runner_up'
+  | 'sucko_exit'
+
+export type PlayoffBracket = 'winners' | 'sucko'
 
 export interface PlayoffResult {
   id: number
   season_id: number
   team_id: number
-  result: 'champion' | 'runner_up' | 'third' | 'fourth' | 'first_round_exit'
+  result: PlayoffResultType
+  bracket: PlayoffBracket
   team?: Team
   season?: Season
+  season_year?: number
 }
 
 export interface SeasonAward {
@@ -63,3 +81,8 @@ export interface TeamWithStats extends Team {
   team_seasons: (TeamSeason & { season: Season })[]
   playoff_results: (PlayoffResult & { season: Season })[]
 }
+
+// Extended types returned from DB queries (season_year joined in)
+export type TeamWithCurrentName = Team & { current_name: string }
+export type TeamSeasonRow = TeamSeason & { season_year: number }
+export type PlayoffResultRow = PlayoffResult & { season_year: number }

@@ -1,14 +1,14 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { Clock, Trophy, FileText } from 'lucide-react'
-import { seasons, playoffResults, seasonAwards, getTeamCurrentName } from '@/lib/placeholder-data'
+import { getTeams, getSeasons, getPlayoffResults, getSeasonAwards, getTeamCurrentName } from '@/lib/queries'
 
 export const metadata: Metadata = { title: 'History' }
 
 const RESULT_BADGE: Record<string, string> = {
-  champion:         'badge badge-champion',
-  runner_up:        'badge badge-runner-up',
-  third:            'badge badge-third',
+  champion:  'badge badge-champion',
+  runner_up: 'badge badge-runner-up',
+  third:     'badge badge-third',
 }
 const RESULT_LABEL: Record<string, string> = {
   champion:  '🏆 Champion',
@@ -16,7 +16,14 @@ const RESULT_LABEL: Record<string, string> = {
   third:     '🥉 3rd Place',
 }
 
-export default function HistoryPage() {
+export default async function HistoryPage() {
+  const [teams, seasons, allResults, allAwards] = await Promise.all([
+    getTeams(),
+    getSeasons(),
+    getPlayoffResults(),
+    getSeasonAwards(),
+  ])
+
   const sortedSeasons = [...seasons].sort((a, b) => b.year - a.year)
 
   return (
@@ -35,13 +42,18 @@ export default function HistoryPage() {
       {/* Timeline */}
       <div className="space-y-6">
         {sortedSeasons.map(season => {
-          const podium = playoffResults
+          const podium = allResults
             .filter(pr => pr.season_id === season.id && ['champion', 'runner_up', 'third'].includes(pr.result))
             .sort((a, b) => {
               const order = ['champion', 'runner_up', 'third']
               return order.indexOf(a.result) - order.indexOf(b.result)
             })
-          const awards = seasonAwards.filter(a => a.season_id === season.id)
+
+          const suckoChamp = allResults.find(
+            pr => pr.season_id === season.id && pr.result === 'sucko_winner'
+          )
+
+          const awards = allAwards.filter(a => a.season_id === season.id)
 
           return (
             <div key={season.id} className="card p-6 space-y-5">
@@ -57,7 +69,7 @@ export default function HistoryPage() {
                   <h2 className="text-xl font-bold">{season.year} Season</h2>
                   {podium.find(p => p.result === 'champion') && (
                     <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      Champion: {getTeamCurrentName(podium.find(p => p.result === 'champion')!.team_id)}
+                      Champion: {getTeamCurrentName(podium.find(p => p.result === 'champion')!.team_id, teams)}
                     </p>
                   )}
                 </div>
@@ -71,9 +83,19 @@ export default function HistoryPage() {
                       <span className={RESULT_BADGE[pr.result] ?? 'badge'}>
                         {RESULT_LABEL[pr.result] ?? pr.result}
                       </span>
-                      <span className="text-sm font-medium">{getTeamCurrentName(pr.team_id)}</span>
+                      <span className="text-sm font-medium">{getTeamCurrentName(pr.team_id, teams)}</span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Sucko Bowl Champ */}
+              {suckoChamp && (
+                <div className="flex items-center gap-2">
+                  <span className="badge badge-defunct">💀 Sucko Champ</span>
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                    {getTeamCurrentName(suckoChamp.team_id, teams)}
+                  </span>
                 </div>
               )}
 
@@ -88,7 +110,9 @@ export default function HistoryPage() {
                       <span className="font-semibold mt-0.5">{award.value}</span>
                       {award.team_id && (
                         <span className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                          {award.player_name ? `Roster: ${getTeamCurrentName(award.team_id)}` : getTeamCurrentName(award.team_id)}
+                          {award.player_name
+                            ? `Roster: ${getTeamCurrentName(award.team_id, teams)}`
+                            : getTeamCurrentName(award.team_id, teams)}
                         </span>
                       )}
                     </div>
@@ -98,7 +122,7 @@ export default function HistoryPage() {
 
               {podium.length === 0 && awards.length === 0 && (
                 <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>
-                  Season data coming soon — add stats to fill this in.
+                  Season data coming soon.
                 </p>
               )}
             </div>

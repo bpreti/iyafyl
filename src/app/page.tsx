@@ -1,11 +1,8 @@
 import { Trophy, Star, Users, Calendar } from 'lucide-react'
-import {
-  teams, seasons, playoffResults, seasonAwards, getTeamCurrentName,
-} from '@/lib/placeholder-data'
 import Link from 'next/link'
-
-const LATEST_SEASON_ID = 7
-const LATEST_YEAR = 2025
+import {
+  getTeams, getSeasons, getPlayoffResults, getSeasonAwards, getTeamCurrentName,
+} from '@/lib/queries'
 
 const resultLabel: Record<string, string> = {
   champion: '🏆 Champion',
@@ -13,14 +10,25 @@ const resultLabel: Record<string, string> = {
   third: '🥉 3rd Place',
 }
 
-export default function HomePage() {
-  const latestResults = playoffResults.filter(pr => pr.season_id === LATEST_SEASON_ID)
-  const awards = seasonAwards.filter(a => a.season_id === LATEST_SEASON_ID)
+export default async function HomePage() {
+  const [teams, seasons, allPlayoffResults, allAwards] = await Promise.all([
+    getTeams(),
+    getSeasons(),
+    getPlayoffResults(),
+    getSeasonAwards(),
+  ])
+
+  const latestSeason = seasons.reduce((max, s) => s.year > max.year ? s : max, seasons[0])
+  const latestSeasonId = latestSeason?.id
+  const latestYear = latestSeason?.year
+
+  const latestResults = allPlayoffResults.filter(pr => pr.season_id === latestSeasonId)
+  const awards = allAwards.filter(a => a.season_id === latestSeasonId)
 
   const champion = latestResults.find(r => r.result === 'champion')
   const runnerUp = latestResults.find(r => r.result === 'runner_up')
-  const third = latestResults.find(r => r.result === 'third')
-  const podium = [champion, runnerUp, third].filter(Boolean) as typeof latestResults
+  const third    = latestResults.find(r => r.result === 'third')
+  const podium   = [champion, runnerUp, third].filter(Boolean) as typeof latestResults
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
@@ -50,10 +58,10 @@ export default function HomePage() {
       {/* Quick stats bar */}
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { icon: <Calendar size={18} />, label: 'Seasons', value: seasons.length },
-          { icon: <Users size={18} />, label: 'Active Teams', value: teams.filter(t => t.is_active).length },
-          { icon: <Trophy size={18} />, label: 'Latest Champion', value: champion ? getTeamCurrentName(champion.team_id) : '—' },
-          { icon: <Star size={18} />, label: 'League Founded', value: 2019 },
+          { icon: <Calendar size={18} />, label: 'Seasons',        value: seasons.length },
+          { icon: <Users size={18} />,    label: 'Active Teams',   value: teams.filter(t => t.is_active).length },
+          { icon: <Trophy size={18} />,   label: 'Latest Champion', value: champion ? getTeamCurrentName(champion.team_id, teams) : '—' },
+          { icon: <Star size={18} />,     label: 'League Founded', value: 2019 },
         ].map(item => (
           <div key={item.label} className="card p-5 flex items-center gap-3">
             <span style={{ color: 'var(--accent-light)' }}>{item.icon}</span>
@@ -65,15 +73,15 @@ export default function HomePage() {
         ))}
       </section>
 
-      {/* 2025 Results */}
+      {/* Latest Season Results */}
       <section className="space-y-6">
         <div className="flex items-center gap-3">
           <Trophy style={{ color: 'var(--gold)' }} />
-          <h2 className="text-2xl font-bold">{LATEST_YEAR} League Results</h2>
+          <h2 className="text-2xl font-bold">{latestYear} League Results</h2>
         </div>
         <div className="grid sm:grid-cols-3 gap-4">
           {podium.map((res, i) => {
-            const teamName = getTeamCurrentName(res.team_id)
+            const teamName = getTeamCurrentName(res.team_id, teams)
             const team = teams.find(t => t.id === res.team_id)
             const badgeClass = ['badge badge-champion', 'badge badge-runner-up', 'badge badge-third'][i]
             return (
@@ -88,30 +96,32 @@ export default function HomePage() {
       </section>
 
       {/* Notable Stats */}
-      <section className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Star style={{ color: 'var(--accent-light)' }} />
-          <h2 className="text-2xl font-bold">{LATEST_YEAR} Notable Statistics</h2>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {awards.map(award => {
-            const teamName = award.team_id ? getTeamCurrentName(award.team_id) : null
-            return (
-              <div key={award.id} className="card p-5 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--accent-light)' }}>
-                  {award.label}
-                </p>
-                <p className="text-xl font-bold">{award.value}</p>
-                {teamName && (
-                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    {award.player_name ? `Roster: ${teamName}` : teamName}
+      {awards.length > 0 && (
+        <section className="space-y-6">
+          <div className="flex items-center gap-3">
+            <Star style={{ color: 'var(--accent-light)' }} />
+            <h2 className="text-2xl font-bold">{latestYear} Notable Statistics</h2>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {awards.map(award => {
+              const teamName = award.team_id ? getTeamCurrentName(award.team_id, teams) : null
+              return (
+                <div key={award.id} className="card p-5 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--accent-light)' }}>
+                    {award.label}
                   </p>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </section>
+                  <p className="text-xl font-bold">{award.value}</p>
+                  {teamName && (
+                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      {award.player_name ? `Roster: ${teamName}` : teamName}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Offseason Notes */}
       <section className="card p-8 space-y-4">

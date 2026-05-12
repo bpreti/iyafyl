@@ -1,32 +1,37 @@
 import { Metadata } from 'next'
 import { BarChart2 } from 'lucide-react'
-import { teams, teamSeasons, seasons, getTeamCurrentName } from '@/lib/placeholder-data'
+import { getTeams, getSeasons, getAllTeamSeasons, getTeamSeasonsForSeason } from '@/lib/queries'
 
 export const metadata: Metadata = { title: 'Regular Season Stats' }
 
-function allTimeTable() {
-  const rows = teams.map(team => {
-    const ts = teamSeasons.filter(t => t.team_id === team.id)
-    const wins = ts.reduce((s, t) => s + t.wins, 0)
-    const losses = ts.reduce((s, t) => s + t.losses, 0)
-    const ties = ts.reduce((s, t) => s + t.ties, 0)
-    const pf = ts.reduce((s, t) => s + Number(t.points_for), 0)
-    const pa = ts.reduce((s, t) => s + Number(t.points_against), 0)
-    const g = wins + losses + ties
-    const wpct = g > 0 ? ((wins + ties * 0.5) / g) : 0
-    return { team, wins, losses, ties, pf, pa, ppg: g > 0 ? pf / g : 0, wpct }
-  }).sort((a, b) => b.wpct - a.wpct)
-  return rows
-}
+export default async function RegularSeasonStatsPage() {
+  const [teams, seasons, allTeamSeasons] = await Promise.all([
+    getTeams(),
+    getSeasons(),
+    getAllTeamSeasons(),
+  ])
 
-export default function RegularSeasonStatsPage() {
-  const allTime = allTimeTable()
-  const latestSeasonId = Math.max(...seasons.map(s => s.id))
-  const latestYear = seasons.find(s => s.id === latestSeasonId)?.year
+  const latestSeason = seasons.reduce((max, s) => s.year > max.year ? s : max, seasons[0])
+  const latestSeasonId = latestSeason?.id
+  const latestYear = latestSeason?.year
 
-  const latestStandings = teamSeasons
+  const latestStandings = allTeamSeasons
     .filter(ts => ts.season_id === latestSeasonId)
     .sort((a, b) => a.final_standing - b.final_standing)
+
+  // All-time records — aggregate per team
+  const allTime = teams.map(team => {
+    const ts = allTeamSeasons.filter(t => t.team_id === team.id)
+    const wins   = ts.reduce((s, t) => s + t.wins, 0)
+    const losses = ts.reduce((s, t) => s + t.losses, 0)
+    const ties   = ts.reduce((s, t) => s + t.ties, 0)
+    const pf     = ts.reduce((s, t) => s + Number(t.points_for), 0)
+    const pa     = ts.reduce((s, t) => s + Number(t.points_against), 0)
+    const g      = wins + losses + ties
+    const wpct   = g > 0 ? ((wins + ties * 0.5) / g) : 0
+    const ppg    = g > 0 ? pf / g : 0
+    return { team, wins, losses, ties, pf, pa, ppg, wpct, seasons: ts.length }
+  }).filter(r => r.seasons > 0).sort((a, b) => b.wpct - a.wpct)
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
@@ -66,7 +71,7 @@ export default function RegularSeasonStatsPage() {
                 return (
                   <tr key={ts.id}>
                     <td className="font-bold" style={{ color: 'var(--text-secondary)' }}>#{ts.final_standing}</td>
-                    <td className="font-semibold">{getTeamCurrentName(team.id)}</td>
+                    <td className="font-semibold">{team.current_name}</td>
                     <td style={{ color: 'var(--text-secondary)' }}>{team.owner_name}</td>
                     <td className="font-medium">{ts.wins}</td>
                     <td>{ts.losses}</td>
@@ -96,6 +101,7 @@ export default function RegularSeasonStatsPage() {
                 <th>Rank</th>
                 <th>Team</th>
                 <th>Owner</th>
+                <th>Seasons</th>
                 <th>W</th>
                 <th>L</th>
                 <th>T</th>
@@ -109,8 +115,9 @@ export default function RegularSeasonStatsPage() {
               {allTime.map((row, i) => (
                 <tr key={row.team.id}>
                   <td className="font-bold" style={{ color: 'var(--text-secondary)' }}>#{i + 1}</td>
-                  <td className="font-semibold">{getTeamCurrentName(row.team.id)}</td>
+                  <td className="font-semibold">{row.team.current_name}</td>
                   <td style={{ color: 'var(--text-secondary)' }}>{row.team.owner_name}</td>
+                  <td>{row.seasons}</td>
                   <td className="font-medium">{row.wins}</td>
                   <td>{row.losses}</td>
                   <td>{row.ties}</td>
