@@ -52,7 +52,7 @@ function TeamCard({ team }: { team: TeamWithCurrentName }) {
     <Link href={`/teams/${team.slug}`} className="card card-hover p-5 flex items-center gap-4 block">
       <div
         className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0"
-        style={{ background: 'rgba(79,70,229,0.2)', color: 'var(--accent-light)' }}
+        style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--accent-light)' }}
       >
         {initials}
       </div>
