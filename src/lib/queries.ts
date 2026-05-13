@@ -4,6 +4,7 @@ import type {
   TeamName,
   Season,
   SeasonAward,
+  Game,
   TeamWithCurrentName,
   TeamSeasonRow,
   PlayoffResultRow,
@@ -172,6 +173,13 @@ export async function getPlayoffResults(opts?: {
   return rows as PlayoffResultRow[]
 }
 
+// ── Games ────────────────────────────────────────────────────────────────────
+
+export async function getAllGames(): Promise<Game[]> {
+  const rows = await sql`SELECT * FROM games ORDER BY season_id, week, id`
+  return rows as Game[]
+}
+
 // ── Season Awards ────────────────────────────────────────────────────────────
 
 export async function getSeasonAwards(seasonId?: number): Promise<SeasonAward[]> {
@@ -185,6 +193,11 @@ export async function getSeasonAwards(seasonId?: number): Promise<SeasonAward[]>
   }
   const rows = await sql`SELECT * FROM season_awards ORDER BY season_id, id`
   return rows as SeasonAward[]
+}
+
+export async function getAllTeamNames(): Promise<TeamName[]> {
+  const rows = await sql`SELECT * FROM team_names ORDER BY team_id, start_year`
+  return rows as TeamName[]
 }
 
 // ── Pure JS Helpers ───────────────────────────────────────────────────────────
