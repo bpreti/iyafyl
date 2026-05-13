@@ -82,6 +82,20 @@ export interface TeamWithStats extends Team {
   playoff_results: (PlayoffResult & { season: Season })[]
 }
 
+export interface Game {
+  id: number
+  season_id: number
+  week: number
+  home_team_id: number
+  away_team_id: number
+  home_score: string
+  away_score: string
+  is_playoff: boolean
+  playoff_round: string | null
+  point_difference: string
+  combined_points: string
+}
+
 // Extended types returned from DB queries (season_year joined in)
 export type TeamWithCurrentName = Team & { current_name: string }
 export type TeamSeasonRow = TeamSeason & { season_year: number }

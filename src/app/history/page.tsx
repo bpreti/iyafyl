@@ -1,16 +1,19 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { FileText } from 'lucide-react'
-import { getTeams, getSeasons, getPlayoffResults, getSeasonAwards, getTeamCurrentName } from '@/lib/queries'
+import { getTeams, getSeasons, getPlayoffResults, getSeasonAwards, getAllGames, getAllTeamNames, getTeamCurrentName } from '@/lib/queries'
+import SeasonSection from '@/components/SeasonSection'
 
 export const metadata: Metadata = { title: 'History' }
 
 export default async function HistoryPage() {
-  const [teams, seasons, allResults, allAwards] = await Promise.all([
+  const [teams, seasons, allResults, allAwards, allGames, allTeamNames] = await Promise.all([
     getTeams(),
     getSeasons(),
     getPlayoffResults(),
     getSeasonAwards(),
+    getAllGames(),
+    getAllTeamNames(),
   ])
 
   const sortedSeasons = [...seasons].sort((a, b) => b.year - a.year)
@@ -30,6 +33,8 @@ export default async function HistoryPage() {
         const suckoChamp     = allResults.find(pr => pr.season_id === season.id && pr.result === 'sucko_winner')
         const awards         = allAwards.filter(a => a.season_id === season.id)
         const hasData        = champResult || suckoChamp || awards.length > 0
+
+        const seasonGames = allGames.filter(g => g.season_id === season.id)
 
         return (
           <div key={season.id} className="space-y-3 pb-8">
@@ -100,6 +105,15 @@ export default async function HistoryPage() {
 
               {!hasData && (
                 <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>Season data coming soon.</p>
+              )}
+
+              {seasonGames.length > 0 && (
+                <SeasonSection
+                  season={season}
+                  games={seasonGames}
+                  teams={teams}
+                  teamNames={allTeamNames}
+                />
               )}
             </div>
           </div>
