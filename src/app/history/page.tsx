@@ -1,20 +1,9 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { Clock, Trophy, FileText } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { getTeams, getSeasons, getPlayoffResults, getSeasonAwards, getTeamCurrentName } from '@/lib/queries'
 
 export const metadata: Metadata = { title: 'History' }
-
-const RESULT_BADGE: Record<string, string> = {
-  champion:  'badge badge-champion',
-  runner_up: 'badge badge-runner-up',
-  third:     'badge badge-third',
-}
-const RESULT_LABEL: Record<string, string> = {
-  champion:  '🏆 Champion',
-  runner_up: '🥈 Runner-Up',
-  third:     '🥉 3rd Place',
-}
 
 export default async function HistoryPage() {
   const [teams, seasons, allResults, allAwards] = await Promise.all([
@@ -27,71 +16,62 @@ export default async function HistoryPage() {
   const sortedSeasons = [...seasons].sort((a, b) => b.year - a.year)
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-4">
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <Clock style={{ color: 'var(--accent-light)' }} />
-          <h1 className="text-4xl font-extrabold">League History</h1>
-        </div>
-        <p style={{ color: 'var(--text-secondary)' }}>
-          A look back at every season of IYAFYL
-        </p>
+      <div className="space-y-1 mb-10">
+        <h1 className="text-4xl font-extrabold">League History</h1>
+        <p style={{ color: 'var(--text-secondary)' }}>A look back at every season of IYAFYL</p>
       </div>
 
-      {/* Timeline */}
-      <div className="space-y-6">
-        {sortedSeasons.map(season => {
-          const podium = allResults
-            .filter(pr => pr.season_id === season.id && ['champion', 'runner_up', 'third'].includes(pr.result))
-            .sort((a, b) => {
-              const order = ['champion', 'runner_up', 'third']
-              return order.indexOf(a.result) - order.indexOf(b.result)
-            })
+      {sortedSeasons.map(season => {
+        const champResult    = allResults.find(pr => pr.season_id === season.id && pr.result === 'champion')
+        const runnerUpResult = allResults.find(pr => pr.season_id === season.id && pr.result === 'runner_up')
+        const thirdResult    = allResults.find(pr => pr.season_id === season.id && pr.result === 'third')
+        const suckoChamp     = allResults.find(pr => pr.season_id === season.id && pr.result === 'sucko_winner')
+        const awards         = allAwards.filter(a => a.season_id === season.id)
+        const hasData        = champResult || suckoChamp || awards.length > 0
 
-          const suckoChamp = allResults.find(
-            pr => pr.season_id === season.id && pr.result === 'sucko_winner'
-          )
+        return (
+          <div key={season.id} className="space-y-3 pb-8">
+            {/* Year strip */}
+            <div className="flex items-baseline gap-3">
+              <span className="text-3xl font-extrabold" style={{ color: 'var(--accent-light)' }}>{season.year}</span>
+              {champResult && (
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  🏆 {getTeamCurrentName(champResult.team_id, teams)}
+                </span>
+              )}
+            </div>
 
-          const awards = allAwards.filter(a => a.season_id === season.id)
-
-          return (
-            <div key={season.id} className="card p-6 space-y-5">
-              {/* Year header */}
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center font-bold text-lg flex-shrink-0"
-                  style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--accent-light)' }}
-                >
-                  {season.year}
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold">{season.year} Season</h2>
-                  {podium.find(p => p.result === 'champion') && (
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      Champion: {getTeamCurrentName(podium.find(p => p.result === 'champion')!.team_id, teams)}
-                    </p>
-                  )}
-                </div>
-              </div>
-
+            <div className="card p-5 sm:p-6 space-y-5">
               {/* Podium */}
-              {podium.length > 0 && (
-                <div className="flex flex-wrap gap-3">
-                  {podium.map(pr => (
-                    <div key={pr.id} className="flex items-center gap-2">
-                      <span className={RESULT_BADGE[pr.result] ?? 'badge'}>
-                        {RESULT_LABEL[pr.result] ?? pr.result}
-                      </span>
-                      <span className="text-sm font-medium">{getTeamCurrentName(pr.team_id, teams)}</span>
+              {champResult && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:items-end">
+                  {runnerUpResult && (
+                    <div className="card-runner-up p-4 space-y-1 order-2 sm:order-1">
+                      <p className="text-xs font-semibold" style={{ color: 'var(--silver)' }}>🥈 Runner-Up</p>
+                      <p className="font-bold leading-tight">{getTeamCurrentName(runnerUpResult.team_id, teams)}</p>
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{teams.find(t => t.id === runnerUpResult.team_id)?.owner_name}</p>
                     </div>
-                  ))}
+                  )}
+                  <div className="card-champion p-5 space-y-1 text-center order-1 sm:order-2 sm:-translate-y-3">
+                    <p className="text-xs font-bold" style={{ color: 'var(--gold)' }}>🏆 Champion</p>
+                    <p className="font-extrabold text-xl leading-tight">{getTeamCurrentName(champResult.team_id, teams)}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{teams.find(t => t.id === champResult.team_id)?.owner_name}</p>
+                  </div>
+                  {thirdResult && (
+                    <div className="card-third p-4 space-y-1 order-3">
+                      <p className="text-xs font-semibold" style={{ color: '#cd7c2a' }}>🥉 3rd Place</p>
+                      <p className="font-bold leading-tight">{getTeamCurrentName(thirdResult.team_id, teams)}</p>
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{teams.find(t => t.id === thirdResult.team_id)?.owner_name}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Sucko Bowl Champ */}
+              {/* Sucko champ */}
               {suckoChamp && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <span className="badge badge-defunct">💀 Sucko Champ</span>
                   <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                     {getTeamCurrentName(suckoChamp.team_id, teams)}
@@ -99,45 +79,40 @@ export default async function HistoryPage() {
                 </div>
               )}
 
-              {/* Awards */}
+              {/* Season awards */}
               {awards.length > 0 && (
-                <div className="grid sm:grid-cols-2 gap-3 pt-1">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {awards.map(award => (
-                    <div key={award.id} className="flex flex-col rounded-lg p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-                      <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--accent-light)' }}>
+                    <div key={award.id} className="rounded-xl p-3 space-y-1" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--accent-light)' }}>
                         {award.label}
-                      </span>
-                      <span className="font-semibold mt-0.5">{award.value}</span>
+                      </p>
+                      <p className="font-bold">{award.value}</p>
                       {award.team_id && (
-                        <span className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                          {award.player_name
-                            ? `Roster: ${getTeamCurrentName(award.team_id, teams)}`
-                            : getTeamCurrentName(award.team_id, teams)}
-                        </span>
+                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          {getTeamCurrentName(award.team_id, teams)}
+                        </p>
                       )}
                     </div>
                   ))}
                 </div>
               )}
 
-              {podium.length === 0 && awards.length === 0 && (
-                <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>
-                  Season data coming soon.
-                </p>
+              {!hasData && (
+                <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>Season data coming soon.</p>
               )}
             </div>
-          )
-        })}
-      </div>
+          </div>
+        )
+      })}
 
       {/* League Constitution */}
-      <div className="card p-6 flex items-start gap-4">
+      <div className="card p-6 flex items-start gap-4 mt-6">
         <FileText size={24} style={{ color: 'var(--accent-light)', flexShrink: 0 }} />
         <div className="space-y-1">
           <h3 className="text-lg font-bold">League Constitution</h3>
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
             The governing rules and regulations of If You Ain&apos;t First You&apos;re Last.
-            Link your constitution document here once the site is live.
           </p>
           <button
             className="mt-2 text-sm font-medium underline-offset-2 hover:underline"
