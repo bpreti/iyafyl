@@ -65,7 +65,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ slu
       <div className="flex items-start gap-5">
         <div
           className="w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-2xl flex-shrink-0"
-          style={{ background: 'rgba(79,70,229,0.2)', color: 'var(--accent-light)' }}
+          style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--accent-light)' }}
         >
           {initials}
         </div>

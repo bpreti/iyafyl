@@ -16,7 +16,7 @@ export default function Navbar() {
   const pathname = usePathname()
 
   return (
-    <header className="sticky top-0 z-50 border-b" style={{ background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(12px)', borderColor: 'var(--border)' }}>
+    <header className="sticky top-0 z-50 border-b" style={{ background: 'rgba(13,11,20,0.85)', backdropFilter: 'blur(12px)', borderColor: 'var(--border)' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2 font-bold text-lg">
@@ -34,7 +34,7 @@ export default function Navbar() {
                   className="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
                   style={{
                     color: active ? 'var(--accent-light)' : 'var(--text-secondary)',
-                    background: active ? 'rgba(79,70,229,0.12)' : 'transparent',
+                    background: active ? 'rgba(124,58,237,0.14)' : 'transparent',
                   }}
                 >
                   {link.label}

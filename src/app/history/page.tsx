@@ -61,7 +61,7 @@ export default async function HistoryPage() {
               <div className="flex items-center gap-3">
                 <div
                   className="w-14 h-14 rounded-xl flex items-center justify-center font-bold text-lg flex-shrink-0"
-                  style={{ background: 'rgba(79,70,229,0.2)', color: 'var(--accent-light)' }}
+                  style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--accent-light)' }}
                 >
                   {season.year}
                 </div>
