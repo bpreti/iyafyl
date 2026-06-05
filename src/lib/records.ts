@@ -256,7 +256,7 @@ function playoffWinsLosses(
   n: number
 ): RecordEntry[] {
   const map = new Map<number, { wins: number; losses: number }>()
-  for (const g of games.filter(g => g.is_playoff)) {
+  for (const g of games.filter(g => g.is_playoff && g.bracket === 'winners')) {
     const homeWon = Number(g.home_score) > Number(g.away_score)
     const hd = map.get(g.home_team_id) ?? { wins: 0, losses: 0 }
     map.set(g.home_team_id, { wins: hd.wins + (homeWon ? 1 : 0), losses: hd.losses + (homeWon ? 0 : 1) })
