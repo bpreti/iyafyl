@@ -1,22 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0d0b14;
-  --surface: #161422;
-  --surface-2: #1e1c2e;
-  --border: #302d46;
+  --background: #f6f5fc;
+  --surface: #ffffff;
+  --surface-2: #eeedf8;
+  --border: #dddbe8;
   --accent: #7c3aed;
-  --accent-light: #a78bfa;
-  --gold: #f59e0b;
-  --silver: #94a3b8;
-  --bronze: #b45309;
-  --text-primary: #f1f5f9;
-  --text-secondary: #9896b0;
+  --accent-light: #6d28d9;
+  --gold: #d97706;
+  --silver: #64748b;
+  --bronze: #92400e;
+  --text-primary: #1c1830;
+  --text-secondary: #6b6888;
 }
 
 body {
   background-color: var(--background);
-  background-image: radial-gradient(ellipse 80% 50% at 50% -5%, rgba(124,58,237,0.1) 0%, transparent 100%);
+  background-image: radial-gradient(ellipse 80% 50% at 50% -5%, rgba(124,58,237,0.07) 0%, transparent 100%);
   color: var(--text-primary);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
@@ -31,46 +31,47 @@ body {
 /* Base card */
 .card {
   background: var(--surface);
-  background-image: linear-gradient(135deg, rgba(255,255,255,0.025) 0%, transparent 60%);
   border: 1px solid var(--border);
   border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.03);
 }
 
 .card-hover {
   transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 .card-hover:hover {
-  border-color: rgba(167,139,250,0.5);
+  border-color: rgba(109,40,217,0.4);
   transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(124,58,237,0.2);
+  box-shadow: 0 8px 28px rgba(124,58,237,0.15);
 }
 
 /* Podium card flavors */
 .card-champion {
-  background: linear-gradient(160deg, rgba(245,158,11,0.14) 0%, rgba(245,158,11,0.04) 100%);
-  border: 1px solid rgba(245,158,11,0.35);
+  background: linear-gradient(160deg, rgba(217,119,6,0.1) 0%, rgba(217,119,6,0.03) 100%);
+  border: 1px solid rgba(217,119,6,0.3);
   border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(217,119,6,0.1);
   transition: box-shadow 0.2s, transform 0.2s;
 }
-.card-champion:hover { box-shadow: 0 8px 32px rgba(245,158,11,0.2); transform: translateY(-2px); }
+.card-champion:hover { box-shadow: 0 8px 28px rgba(217,119,6,0.18); transform: translateY(-2px); }
 
 .card-runner-up {
   background: var(--surface);
-  background-image: linear-gradient(135deg, rgba(148,163,184,0.06) 0%, transparent 60%);
-  border: 1px solid rgba(148,163,184,0.2);
+  border: 1px solid rgba(100,116,139,0.25);
   border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   transition: box-shadow 0.2s, transform 0.2s;
 }
-.card-runner-up:hover { box-shadow: 0 4px 16px rgba(148,163,184,0.15); transform: translateY(-2px); }
+.card-runner-up:hover { box-shadow: 0 4px 16px rgba(100,116,139,0.15); transform: translateY(-2px); }
 
 .card-third {
   background: var(--surface);
-  background-image: linear-gradient(135deg, rgba(180,83,9,0.08) 0%, transparent 60%);
-  border: 1px solid rgba(180,83,9,0.25);
+  border: 1px solid rgba(146,64,14,0.2);
   border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   transition: box-shadow 0.2s, transform 0.2s;
 }
-.card-third:hover { box-shadow: 0 4px 16px rgba(180,83,9,0.15); transform: translateY(-2px); }
+.card-third:hover { box-shadow: 0 4px 16px rgba(146,64,14,0.12); transform: translateY(-2px); }
 
 /* Pill buttons */
 .btn-primary {
@@ -141,8 +142,8 @@ body {
 .badge-champion  { background: rgba(245,158,11,0.15);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
 .badge-runner-up { background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }
 .badge-third     { background: rgba(180,83,9,0.15);    color: #cd7c2a; border: 1px solid rgba(180,83,9,0.3); }
-.badge-active    { background: rgba(34,197,94,0.1);    color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
-.badge-defunct   { background: rgba(239,68,68,0.1);    color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+.badge-active    { background: rgba(22,163,74,0.1);    color: #16a34a; border: 1px solid rgba(22,163,74,0.25); }
+.badge-defunct   { background: rgba(220,38,38,0.08);   color: #dc2626; border: 1px solid rgba(220,38,38,0.2); }
 
 /* Tables (kept for any remaining uses) */
 table { border-collapse: collapse; width: 100%; }
