@@ -113,6 +113,7 @@ export default async function HistoryPage() {
                   games={seasonGames}
                   teams={teams}
                   teamNames={allTeamNames}
+                  playoffResults={allResults.filter(pr => pr.season_id === season.id)}
                 />
               )}
             </div>
