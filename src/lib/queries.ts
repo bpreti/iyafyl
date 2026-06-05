@@ -214,7 +214,8 @@ export function getTeamCurrentName(
 export function computeCareerStats(
   teamId: number,
   teamSeasons: TeamSeasonRow[],
-  playoffResults: PlayoffResultRow[]
+  playoffResults: PlayoffResultRow[],
+  games: Game[]
 ) {
   const ts = teamSeasons.filter(t => t.team_id === teamId)
   const wins   = ts.reduce((s, t) => s + t.wins, 0)
@@ -225,20 +226,25 @@ export function computeCareerStats(
   const gamesPlayed = wins + losses + ties
   const playoffAppearances = ts.filter(t => t.made_playoffs).length
 
-  const pResults = playoffResults.filter(pr => pr.team_id === teamId)
-  const championships = pResults.filter(pr => pr.result === 'champion').length
+  const championships = playoffResults.filter(
+    pr => pr.team_id === teamId && pr.result === 'champion'
+  ).length
 
-  // Simple playoff W/L based on finish (winners bracket only)
-  const winnersBracket = pResults.filter(pr => pr.bracket === 'winners')
-  const playoffWins =
-    winnersBracket.filter(r => r.result === 'champion').length * 2 +
-    winnersBracket.filter(r => r.result === 'runner_up').length * 1 +
-    winnersBracket.filter(r => r.result === 'third').length * 1 +
-    winnersBracket.filter(r => r.result === 'fifth').length * 1
-  const playoffLosses =
-    winnersBracket.filter(r =>
-      r.result === 'runner_up' || r.result === 'fourth' || r.result === 'sixth'
-    ).length
+  // Compute playoff W/L from actual game results (winners bracket only)
+  const playoffGames = games.filter(
+    g => g.is_playoff && g.bracket === 'winners' &&
+      (g.home_team_id === teamId || g.away_team_id === teamId)
+  )
+  const playoffWins = playoffGames.filter(g => {
+    const mine = g.home_team_id === teamId ? Number(g.home_score) : Number(g.away_score)
+    const opp  = g.home_team_id === teamId ? Number(g.away_score) : Number(g.home_score)
+    return mine > opp
+  }).length
+  const playoffLosses = playoffGames.filter(g => {
+    const mine = g.home_team_id === teamId ? Number(g.home_score) : Number(g.away_score)
+    const opp  = g.home_team_id === teamId ? Number(g.away_score) : Number(g.home_score)
+    return mine < opp
+  }).length
 
   return {
     wins,
@@ -256,10 +262,20 @@ export function computeCareerStats(
 
 // ── Convenience: fetch all data needed for career stats in one call ───────────
 
+export async function getTeamGames(teamId: number): Promise<Game[]> {
+  const rows = await sql`
+    SELECT * FROM games
+    WHERE home_team_id = ${teamId} OR away_team_id = ${teamId}
+    ORDER BY season_id, week
+  `
+  return rows as Game[]
+}
+
 export async function getTeamDetailData(teamId: number) {
-  const [teamSeasons, playoffResults] = await Promise.all([
+  const [teamSeasons, playoffResults, games] = await Promise.all([
     getTeamSeasons(teamId),
     getPlayoffResults({ teamId }),
+    getTeamGames(teamId),
   ])
-  return { teamSeasons, playoffResults }
+  return { teamSeasons, playoffResults, games }
 }

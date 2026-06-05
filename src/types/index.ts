@@ -92,6 +92,7 @@ export interface Game {
   away_score: string
   is_playoff: boolean
   playoff_round: string | null
+  bracket: 'winners' | 'sucko' | null
   point_difference: string
   combined_points: string
 }

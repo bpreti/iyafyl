@@ -137,35 +137,45 @@ function GameRow({
 
 // ── Week Block ────────────────────────────────────────────────────────────────
 
+const blockStyles = {
+  regular: {
+    header: { background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' },
+    label:  { color: 'var(--text-secondary)' },
+    emoji:  null,
+  },
+  winners: {
+    header: { background: 'rgba(234,179,8,0.1)', borderBottom: '1px solid rgba(234,179,8,0.25)' },
+    label:  { color: 'var(--gold)' },
+    emoji:  '🏆',
+  },
+  sucko: {
+    header: { background: 'rgba(220,38,38,0.06)', borderBottom: '1px solid rgba(220,38,38,0.15)' },
+    label:  { color: '#dc2626' },
+    emoji:  '💀',
+  },
+}
+
 function WeekBlock({
   label,
   games,
   year,
   teams,
   teamNames,
-  isPlayoff,
+  variant = 'regular',
 }: {
   label: string
   games: Game[]
   year: number
   teams: TeamWithCurrentName[]
   teamNames: TeamName[]
-  isPlayoff?: boolean
+  variant?: 'regular' | 'winners' | 'sucko'
 }) {
+  const s = blockStyles[variant]
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
-      <div
-        className="px-3 py-2 flex items-center gap-2"
-        style={{
-          background: isPlayoff ? 'rgba(245,158,11,0.08)' : 'var(--surface-2)',
-          borderBottom: '1px solid var(--border)',
-        }}
-      >
-        {isPlayoff && <span className="text-xs">🏆</span>}
-        <span
-          className="text-xs font-bold uppercase tracking-wider"
-          style={{ color: isPlayoff ? 'var(--gold)' : 'var(--text-secondary)' }}
-        >
+      <div className="px-3 py-2 flex items-center gap-2" style={s.header}>
+        {s.emoji && <span className="text-xs">{s.emoji}</span>}
+        <span className="text-xs font-bold uppercase tracking-wider" style={s.label}>
           {label}
         </span>
         <span className="text-xs ml-auto" style={{ color: 'var(--text-secondary)' }}>{games.length} game{games.length !== 1 ? 's' : ''}</span>
@@ -220,22 +230,26 @@ export default function SeasonSection({ season, games, teams, teamNames }: Seaso
     return map
   }, [filteredGames])
 
-  // Group playoffs by round
-  const roundMap = useMemo(() => {
-    const map = new Map<string, Game[]>()
+  // Group playoff games by bracket + round
+  const { winnersRoundMap, suckoRoundMap } = useMemo(() => {
+    const winners = new Map<string, Game[]>()
+    const sucko   = new Map<string, Game[]>()
     filteredGames.filter(g => g.is_playoff).forEach(g => {
       const key = g.playoff_round ?? 'unknown'
+      const map = g.bracket === 'sucko' ? sucko : winners
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(g)
     })
-    return map
+    return { winnersRoundMap: winners, suckoRoundMap: sucko }
   }, [filteredGames])
 
-  // Count total distinct playoff rounds (from all games, not filtered)
-  const totalPlayoffRounds = useMemo(() => {
-    const rounds = new Set(games.filter(g => g.is_playoff).map(g => g.playoff_round))
-    return rounds.size
-  }, [games])
+  // Total distinct rounds per bracket (from all unfiltered games, for correct labels)
+  const totalWinnersRounds = useMemo(() =>
+    new Set(games.filter(g => g.is_playoff && g.bracket !== 'sucko').map(g => g.playoff_round)).size
+  , [games])
+  const totalSuckoRounds = useMemo(() =>
+    new Set(games.filter(g => g.is_playoff && g.bracket === 'sucko').map(g => g.playoff_round)).size
+  , [games])
 
   const toggleTeam = (id: number) =>
     setSelectedTeams(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -323,24 +337,50 @@ export default function SeasonSection({ season, games, teams, teamNames }: Seaso
                 ))}
             </div>
 
-            {/* Playoff rounds */}
-            {roundMap.size > 0 && (
-              <div className="space-y-3">
-                {[...roundMap.entries()]
-                  .sort((a, b) => a[0].localeCompare(b[0]))
-                  .map(([round, rGames]) => (
-                    <WeekBlock
-                      key={round}
-                      label={playoffRoundLabel(round, totalPlayoffRounds)}
-                      games={rGames}
-                      year={season.year}
-                      teams={teams}
-                      teamNames={teamNames}
-                      isPlayoff
-                    />
-                  ))}
+            {/* Winners bracket */}
+            {winnersRoundMap.size > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--gold)' }}>🏆 Playoffs</p>
+                <div className="space-y-3">
+                  {[...winnersRoundMap.entries()]
+                    .sort((a, b) => a[0].localeCompare(b[0]))
+                    .map(([round, rGames]) => (
+                      <WeekBlock
+                        key={round}
+                        label={playoffRoundLabel(round, totalWinnersRounds)}
+                        games={rGames}
+                        year={season.year}
+                        teams={teams}
+                        teamNames={teamNames}
+                        variant="winners"
+                      />
+                    ))}
+                </div>
               </div>
             )}
+
+            {/* Sucko bracket */}
+            {suckoRoundMap.size > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#dc2626' }}>💀 Sucko Bowl Tournament</p>
+                <div className="space-y-3">
+                  {[...suckoRoundMap.entries()]
+                    .sort((a, b) => a[0].localeCompare(b[0]))
+                    .map(([round, rGames]) => (
+                      <WeekBlock
+                        key={round}
+                        label={playoffRoundLabel(round, totalSuckoRounds)}
+                        games={rGames}
+                        year={season.year}
+                        teams={teams}
+                        teamNames={teamNames}
+                        variant="sucko"
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
+
           </div>
         )}
       </div>

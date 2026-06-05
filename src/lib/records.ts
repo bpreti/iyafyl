@@ -240,6 +240,224 @@ function streakRecords(
   }))
 }
 
+// ── Playoff helpers ───────────────────────────────────────────────────────────
+
+function playoffRoundLabel(round: string, totalRounds: number): string {
+  if (totalRounds <= 2) return round === 'round_1' ? 'Semifinals' : 'Championship'
+  if (round === 'round_1') return 'First Round'
+  if (round === 'round_2') return 'Semifinals'
+  return 'Championship'
+}
+
+function playoffWinsLosses(
+  games: Game[],
+  teams: TeamWithCurrentName[],
+  key: 'wins' | 'losses',
+  n: number
+): RecordEntry[] {
+  const map = new Map<number, { wins: number; losses: number }>()
+  for (const g of games.filter(g => g.is_playoff)) {
+    const homeWon = Number(g.home_score) > Number(g.away_score)
+    const hd = map.get(g.home_team_id) ?? { wins: 0, losses: 0 }
+    map.set(g.home_team_id, { wins: hd.wins + (homeWon ? 1 : 0), losses: hd.losses + (homeWon ? 0 : 1) })
+    const ad = map.get(g.away_team_id) ?? { wins: 0, losses: 0 }
+    map.set(g.away_team_id, { wins: ad.wins + (homeWon ? 0 : 1), losses: ad.losses + (homeWon ? 1 : 0) })
+  }
+  return [...map.entries()]
+    .map(([teamId, d]) => {
+      const team = teams.find(t => t.id === teamId)
+      return { label: team?.current_name ?? 'Unknown', sublabel: team?.owner_name ?? '', value: d[key], gp: d.wins + d.losses }
+    })
+    .sort((a, b) => b.value - a.value)
+    .slice(0, n)
+    .map((e, i) => ({ rank: i + 1, label: e.label, sublabel: e.sublabel, value: String(e.value), context: `${e.gp} playoff game${e.gp !== 1 ? 's' : ''}` }))
+}
+
+function playoffResultCount(
+  playoffResults: PlayoffResultRow[],
+  teams: TeamWithCurrentName[],
+  filterFn: (pr: PlayoffResultRow) => boolean,
+  contextFn: (teamId: number) => string,
+  n: number
+): RecordEntry[] {
+  const map = new Map<number, number>()
+  for (const pr of playoffResults.filter(filterFn)) {
+    map.set(pr.team_id, (map.get(pr.team_id) ?? 0) + 1)
+  }
+  return [...map.entries()]
+    .map(([teamId, count]) => {
+      const team = teams.find(t => t.id === teamId)
+      return { label: team?.current_name ?? 'Unknown', sublabel: team?.owner_name ?? '', value: count, context: contextFn(teamId) }
+    })
+    .sort((a, b) => b.value - a.value)
+    .slice(0, n)
+    .map((e, i) => ({ rank: i + 1, label: e.label, sublabel: e.sublabel, value: String(e.value), context: e.context }))
+}
+
+function playoffGameScores(
+  games: Game[],
+  seasons: Season[],
+  teams: TeamWithCurrentName[],
+  teamNames: TeamName[],
+  desc: boolean,
+  n: number
+): RecordEntry[] {
+  // Precompute total rounds per season for correct round labels
+  const roundsPerSeason = new Map<number, Set<string>>()
+  for (const g of games.filter(g => g.is_playoff)) {
+    if (!roundsPerSeason.has(g.season_id)) roundsPerSeason.set(g.season_id, new Set())
+    roundsPerSeason.get(g.season_id)!.add(g.playoff_round ?? '')
+  }
+
+  const entries: Array<{ teamName: string; ownerName: string; value: number; year: number; round: string; opp: string }> = []
+  for (const g of games.filter(g => g.is_playoff)) {
+    const season = seasons.find(s => s.id === g.season_id)
+    if (!season) continue
+    const totalRounds = roundsPerSeason.get(g.season_id)?.size ?? 1
+    const round = playoffRoundLabel(g.playoff_round ?? '', totalRounds)
+    entries.push({
+      teamName: getTeamNameForYear(g.home_team_id, season.year, teamNames),
+      ownerName: teams.find(t => t.id === g.home_team_id)?.owner_name ?? '',
+      value: Number(g.home_score), year: season.year, round,
+      opp: getTeamNameForYear(g.away_team_id, season.year, teamNames),
+    })
+    entries.push({
+      teamName: getTeamNameForYear(g.away_team_id, season.year, teamNames),
+      ownerName: teams.find(t => t.id === g.away_team_id)?.owner_name ?? '',
+      value: Number(g.away_score), year: season.year, round,
+      opp: getTeamNameForYear(g.home_team_id, season.year, teamNames),
+    })
+  }
+  entries.sort((a, b) => desc ? b.value - a.value : a.value - b.value)
+  return entries.slice(0, n).map((e, i) => ({
+    rank: i + 1, label: e.teamName, sublabel: e.ownerName,
+    value: e.value.toFixed(2),
+    context: `${e.year} ${e.round} · vs ${e.opp}`,
+  }))
+}
+
+const BEST_PLAYER_PERFORMANCES: RecordEntry[] = [
+  { rank: 1, label: 'Alvin Kamara',   sublabel: 'Brent',   value: '53.20', context: '2020 Finals' },
+  { rank: 2, label: "Ja'Marr Chase",  sublabel: 'Taylor',  value: '44.60', context: '2021 Finals' },
+  { rank: 3, label: 'Josh Allen',     sublabel: 'George',  value: '41.28', context: '2024 Consolation 1st Rd.' },
+  { rank: 4, label: 'Amari Cooper',   sublabel: 'Brianna', value: '40.50', context: '2023 Consolation 2nd Rd.' },
+  { rank: 5, label: 'Saquon Barkley', sublabel: 'Jess',    value: '39.90', context: '2019 3rd Place' },
+]
+
+export function computePlayoffRecords(
+  games: Game[],
+  seasons: Season[],
+  teams: TeamWithCurrentName[],
+  teamNames: TeamName[],
+  playoffResults: PlayoffResultRow[],
+  n = 5
+): RecordCategory[] {
+  const winnerResults = playoffResults.filter(pr => pr.bracket === 'winners')
+  const suckoResults  = playoffResults.filter(pr => pr.bracket === 'sucko')
+
+  const playoffSeasonCount = (teamId: number) => {
+    const c = winnerResults.filter(pr => pr.team_id === teamId).length
+    return `${c} playoff season${c !== 1 ? 's' : ''}`
+  }
+  const suckoSeasonCount = (teamId: number) => {
+    const c = suckoResults.filter(pr => pr.team_id === teamId).length
+    return `${c} sucko season${c !== 1 ? 's' : ''}`
+  }
+
+  return [
+    {
+      id: 'playoff-wins',
+      title: 'Most Wins All Time',
+      emoji: '🏆',
+      variant: 'positive',
+      entries: playoffWinsLosses(games, teams, 'wins', n),
+    },
+    {
+      id: 'playoff-losses',
+      title: 'Most Losses All Time',
+      emoji: '💔',
+      variant: 'negative',
+      entries: playoffWinsLosses(games, teams, 'losses', n),
+    },
+    {
+      id: 'champ-appearances',
+      title: 'Most Championship Game Appearances',
+      emoji: '🎯',
+      variant: 'positive',
+      entries: playoffResultCount(
+        playoffResults, teams,
+        pr => pr.bracket === 'winners' && (pr.result === 'champion' || pr.result === 'runner_up'),
+        playoffSeasonCount, n
+      ),
+    },
+    {
+      id: 'sucko-appearances',
+      title: 'Most Sucko Bowl Championship Appearances',
+      emoji: '💀',
+      variant: 'negative',
+      entries: playoffResultCount(
+        playoffResults, teams,
+        pr => pr.bracket === 'sucko' && (pr.result === 'sucko_winner' || pr.result === 'sucko_runner_up'),
+        suckoSeasonCount, n
+      ),
+    },
+    {
+      id: 'championships',
+      title: 'Most Championships',
+      emoji: '👑',
+      variant: 'positive',
+      entries: playoffResultCount(
+        playoffResults, teams,
+        pr => pr.result === 'champion',
+        playoffSeasonCount, n
+      ),
+    },
+    {
+      id: 'sucko-titles',
+      title: 'Most Sucko Bowl Championships',
+      emoji: '☠️',
+      variant: 'negative',
+      entries: playoffResultCount(
+        playoffResults, teams,
+        pr => pr.result === 'sucko_winner',
+        suckoSeasonCount, n
+      ),
+    },
+    {
+      id: 'playoff-high-score',
+      title: 'Most Points in a Single Game',
+      emoji: '🔥',
+      variant: 'positive',
+      entries: playoffGameScores(games, seasons, teams, teamNames, true, n),
+    },
+    {
+      id: 'playoff-low-score',
+      title: 'Fewest Points in a Single Game',
+      emoji: '🥶',
+      variant: 'negative',
+      entries: playoffGameScores(games, seasons, teams, teamNames, false, n),
+    },
+    {
+      id: 'best-player',
+      title: 'Best Individual Player Performance',
+      emoji: '⭐',
+      variant: 'positive',
+      entries: BEST_PLAYER_PERFORMANCES,
+    },
+    {
+      id: 'playoff-appearances',
+      title: 'Most Playoff Appearances',
+      emoji: '🎖️',
+      variant: 'positive',
+      entries: playoffResultCount(
+        playoffResults, teams,
+        pr => pr.bracket === 'winners',
+        playoffSeasonCount, n
+      ),
+    },
+  ]
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function computeRegularSeasonRecords(
