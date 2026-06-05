@@ -1,0 +1,353 @@
+import type { Game, Season, TeamWithCurrentName, TeamName, TeamSeasonRow } from '@/types'
+
+// ── Shared helper ─────────────────────────────────────────────────────────────
+
+export function getTeamNameForYear(teamId: number, year: number, teamNames: TeamName[]): string {
+  const match = teamNames.find(
+    n => n.team_id === teamId && n.start_year <= year && (n.end_year === null || n.end_year >= year)
+  )
+  return match?.name ?? 'Unknown'
+}
+
+// ── Record types ──────────────────────────────────────────────────────────────
+
+export interface RecordEntry {
+  rank: number
+  label: string      // team name or matchup
+  sublabel: string   // owner name or matchup context
+  value: string      // formatted stat value
+  context: string    // year / week / record context
+}
+
+export interface RecordCategory {
+  id: string
+  title: string
+  emoji: string
+  variant: 'positive' | 'negative'
+  entries: RecordEntry[]
+}
+
+// ── Individual team-game scores ───────────────────────────────────────────────
+
+function teamGameScores(
+  games: Game[],
+  seasons: Season[],
+  teams: TeamWithCurrentName[],
+  teamNames: TeamName[],
+  desc: boolean,
+  n: number
+): RecordEntry[] {
+  const entries: Array<{
+    teamName: string; ownerName: string; value: number
+    year: number; week: number; oppName: string
+  }> = []
+
+  for (const g of games.filter(g => !g.is_playoff)) {
+    const year = seasons.find(s => s.id === g.season_id)?.year
+    if (!year) continue
+    entries.push({
+      teamName: getTeamNameForYear(g.home_team_id, year, teamNames),
+      ownerName: teams.find(t => t.id === g.home_team_id)?.owner_name ?? '',
+      value: Number(g.home_score),
+      year, week: g.week,
+      oppName: getTeamNameForYear(g.away_team_id, year, teamNames),
+    })
+    entries.push({
+      teamName: getTeamNameForYear(g.away_team_id, year, teamNames),
+      ownerName: teams.find(t => t.id === g.away_team_id)?.owner_name ?? '',
+      value: Number(g.away_score),
+      year, week: g.week,
+      oppName: getTeamNameForYear(g.home_team_id, year, teamNames),
+    })
+  }
+
+  entries.sort((a, b) => desc ? b.value - a.value : a.value - b.value)
+
+  return entries.slice(0, n).map((e, i) => ({
+    rank: i + 1,
+    label: e.teamName,
+    sublabel: e.ownerName,
+    value: e.value.toFixed(2),
+    context: `${e.year} · Wk ${e.week} · vs ${e.oppName}`,
+  }))
+}
+
+// ── Game-pair records (combined score, blowout, closest) ─────────────────────
+
+function gamePairRecords(
+  games: Game[],
+  seasons: Season[],
+  teamNames: TeamName[],
+  key: 'combined_points' | 'point_difference',
+  desc: boolean,
+  n: number
+): RecordEntry[] {
+  const entries = games
+    .filter(g => !g.is_playoff)
+    .map(g => {
+      const year = seasons.find(s => s.id === g.season_id)?.year ?? 0
+      const awayScore = Number(g.away_score)
+      const homeScore = Number(g.home_score)
+      return {
+        value: Number(g[key]),
+        year,
+        week: g.week,
+        awayName: getTeamNameForYear(g.away_team_id, year, teamNames),
+        homeName: getTeamNameForYear(g.home_team_id, year, teamNames),
+        awayScore,
+        homeScore,
+      }
+    })
+
+  entries.sort((a, b) => desc ? b.value - a.value : a.value - b.value)
+
+  return entries.slice(0, n).map((e, i) => ({
+    rank: i + 1,
+    label: `${e.awayName} vs ${e.homeName}`,
+    sublabel: `${e.year} · Week ${e.week}`,
+    value: e.value.toFixed(2),
+    context: `${e.awayScore.toFixed(2)} — ${e.homeScore.toFixed(2)}`,
+  }))
+}
+
+// ── Per-season totals ─────────────────────────────────────────────────────────
+
+function seasonTotals(
+  teamSeasons: TeamSeasonRow[],
+  teams: TeamWithCurrentName[],
+  teamNames: TeamName[],
+  key: 'points_for' | 'wins' | 'losses',
+  desc: boolean,
+  n: number,
+  fmt: (v: number) => string
+): RecordEntry[] {
+  const entries = teamSeasons.map(ts => ({
+    teamName: getTeamNameForYear(ts.team_id, ts.season_year, teamNames),
+    ownerName: teams.find(t => t.id === ts.team_id)?.owner_name ?? '',
+    value: Number(ts[key]),
+    year: ts.season_year,
+    record: `${ts.wins}–${ts.losses}`,
+  }))
+
+  entries.sort((a, b) => desc ? b.value - a.value : a.value - b.value)
+
+  return entries.slice(0, n).map((e, i) => ({
+    rank: i + 1,
+    label: e.teamName,
+    sublabel: e.ownerName,
+    value: fmt(e.value),
+    context: `${e.year} Season · ${e.record}`,
+  }))
+}
+
+// ── All-time aggregates ───────────────────────────────────────────────────────
+
+function allTimeAggregates(
+  teamSeasons: TeamSeasonRow[],
+  teams: TeamWithCurrentName[],
+  key: 'wins' | 'losses',
+  n: number
+): RecordEntry[] {
+  const map = new Map<number, { wins: number; losses: number; seasons: number }>()
+
+  for (const ts of teamSeasons) {
+    const cur = map.get(ts.team_id) ?? { wins: 0, losses: 0, seasons: 0 }
+    map.set(ts.team_id, {
+      wins:    cur.wins    + ts.wins,
+      losses:  cur.losses  + ts.losses,
+      seasons: cur.seasons + 1,
+    })
+  }
+
+  const entries = [...map.entries()].map(([teamId, data]) => {
+    const team = teams.find(t => t.id === teamId)
+    return {
+      label:    team?.current_name ?? 'Unknown',
+      sublabel: team?.owner_name ?? '',
+      value:    data[key],
+      seasons:  data.seasons,
+    }
+  })
+
+  entries.sort((a, b) => b.value - a.value)
+
+  return entries.slice(0, n).map((e, i) => ({
+    rank: i + 1,
+    label: e.label,
+    sublabel: e.sublabel,
+    value: String(e.value),
+    context: `${e.seasons} season${e.seasons !== 1 ? 's' : ''}`,
+  }))
+}
+
+// ── Streak records ────────────────────────────────────────────────────────────
+
+function streakRecords(
+  games: Game[],
+  seasons: Season[],
+  teams: TeamWithCurrentName[],
+  teamNames: TeamName[],
+  type: 'win' | 'loss',
+  n: number
+): RecordEntry[] {
+  const records: Array<{ teamName: string; ownerName: string; streak: number; year: number }> = []
+
+  for (const season of seasons) {
+    const regGames = games.filter(g => g.season_id === season.id && !g.is_playoff)
+    const teamIds = [...new Set(regGames.flatMap(g => [g.home_team_id, g.away_team_id]))]
+
+    for (const teamId of teamIds) {
+      const teamGames = regGames
+        .filter(g => g.home_team_id === teamId || g.away_team_id === teamId)
+        .sort((a, b) => a.week - b.week)
+
+      let maxStreak = 0
+      let curStreak = 0
+
+      for (const g of teamGames) {
+        const myScore  = g.home_team_id === teamId ? Number(g.home_score) : Number(g.away_score)
+        const oppScore = g.home_team_id === teamId ? Number(g.away_score) : Number(g.home_score)
+        const won = myScore > oppScore
+
+        const matches = type === 'win' ? won : !won
+        if (matches) {
+          curStreak++
+          if (curStreak > maxStreak) maxStreak = curStreak
+        } else {
+          curStreak = 0
+        }
+      }
+
+      if (maxStreak > 0) {
+        records.push({
+          teamName: getTeamNameForYear(teamId, season.year, teamNames),
+          ownerName: teams.find(t => t.id === teamId)?.owner_name ?? '',
+          streak: maxStreak,
+          year: season.year,
+        })
+      }
+    }
+  }
+
+  records.sort((a, b) => b.streak - a.streak)
+
+  return records.slice(0, n).map((e, i) => ({
+    rank: i + 1,
+    label: e.teamName,
+    sublabel: e.ownerName,
+    value: `${e.streak} games`,
+    context: `${e.year} Season`,
+  }))
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+
+export function computeRegularSeasonRecords(
+  games: Game[],
+  seasons: Season[],
+  teams: TeamWithCurrentName[],
+  teamNames: TeamName[],
+  teamSeasons: TeamSeasonRow[],
+  n = 5
+): RecordCategory[] {
+  return [
+    {
+      id: 'most-pts-season',
+      title: 'Most Points in a Single Season',
+      emoji: '🔥',
+      variant: 'positive',
+      entries: seasonTotals(teamSeasons, teams, teamNames, 'points_for', true, n, v => v.toFixed(2)),
+    },
+    {
+      id: 'least-pts-season',
+      title: 'Least Points in a Single Season',
+      emoji: '📉',
+      variant: 'negative',
+      entries: seasonTotals(teamSeasons, teams, teamNames, 'points_for', false, n, v => v.toFixed(2)),
+    },
+    {
+      id: 'most-pts-game',
+      title: 'Most Points in a Single Game',
+      emoji: '💥',
+      variant: 'positive',
+      entries: teamGameScores(games, seasons, teams, teamNames, true, n),
+    },
+    {
+      id: 'fewest-pts-game',
+      title: 'Fewest Points in a Single Game',
+      emoji: '😬',
+      variant: 'negative',
+      entries: teamGameScores(games, seasons, teams, teamNames, false, n),
+    },
+    {
+      id: 'highest-combined',
+      title: 'Highest Scoring Game',
+      emoji: '🚀',
+      variant: 'positive',
+      entries: gamePairRecords(games, seasons, teamNames, 'combined_points', true, n),
+    },
+    {
+      id: 'lowest-combined',
+      title: 'Lowest Scoring Game',
+      emoji: '🥶',
+      variant: 'negative',
+      entries: gamePairRecords(games, seasons, teamNames, 'combined_points', false, n),
+    },
+    {
+      id: 'biggest-blowout',
+      title: 'Biggest Blowouts',
+      emoji: '💣',
+      variant: 'positive',
+      entries: gamePairRecords(games, seasons, teamNames, 'point_difference', true, n),
+    },
+    {
+      id: 'closest-game',
+      title: 'Closest Games',
+      emoji: '😤',
+      variant: 'positive',
+      entries: gamePairRecords(games, seasons, teamNames, 'point_difference', false, n),
+    },
+    {
+      id: 'most-wins-season',
+      title: 'Most Wins in a Single Season',
+      emoji: '🏅',
+      variant: 'positive',
+      entries: seasonTotals(teamSeasons, teams, teamNames, 'wins', true, n, v => `${v}`),
+    },
+    {
+      id: 'most-losses-season',
+      title: 'Most Losses in a Single Season',
+      emoji: '😔',
+      variant: 'negative',
+      entries: seasonTotals(teamSeasons, teams, teamNames, 'losses', true, n, v => `${v}`),
+    },
+    {
+      id: 'win-streak',
+      title: 'Longest Winning Streak',
+      emoji: '⚡',
+      variant: 'positive',
+      entries: streakRecords(games, seasons, teams, teamNames, 'win', n),
+    },
+    {
+      id: 'loss-streak',
+      title: 'Longest Losing Streak',
+      emoji: '💀',
+      variant: 'negative',
+      entries: streakRecords(games, seasons, teams, teamNames, 'loss', n),
+    },
+    {
+      id: 'most-wins-alltime',
+      title: 'Most Wins All Time',
+      emoji: '👑',
+      variant: 'positive',
+      entries: allTimeAggregates(teamSeasons, teams, 'wins', n),
+    },
+    {
+      id: 'most-losses-alltime',
+      title: 'Most Losses All Time',
+      emoji: '🪦',
+      variant: 'negative',
+      entries: allTimeAggregates(teamSeasons, teams, 'losses', n),
+    },
+  ]
+}
