@@ -107,16 +107,32 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* Featured video */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 pb-16 space-y-5">
+        <h2 className="text-2xl font-bold">🎬 What we&apos;re all about here</h2>
+        <div className="card overflow-hidden">
+          <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+            <iframe
+              src="https://www.youtube.com/embed/y4usE2RePqo"
+              title="IYAFYL Featured Video"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="absolute inset-0 w-full h-full"
+            />
+          </div>
+        </div>
+      </section>
+
       {/* Offseason notes */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 pb-16">
         <div className="card p-6 sm:p-8 space-y-4">
           <h2 className="text-xl font-bold">📋 Offseason Notes</h2>
           <ul className="space-y-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
             {[
-              'Champion determining 2026 draft order methodology',
-              'Trophy nameplates being shipped to winners',
-              'Commissioner outreach planned for summer participation confirmation',
-              'Late summer kickoff meeting and rules updates scheduled',
+              'Champion determining 2026 draft order process',
+              'Commissioner already reached out about 2026 season',
+              'Late summer meeting about new league season coming soon.',
+              'Draft date questionnaire going out soon',
             ].map(note => (
               <li key={note} className="flex items-start gap-2">
                 <span style={{ color: 'var(--accent-light)' }} className="mt-0.5 flex-shrink-0">→</span>
