@@ -131,9 +131,9 @@ export default function ConstitutionPage() {
                   {[
                     ['QB', '1', '4'],
                     ['RB', '2', '8'],
-                    ['WR', '3', '8'],
+                    ['WR', '2', '8'],
                     ['TE', '1', '3'],
-                    ['FLEX', '1', 'N/A'],
+                    ['FLEX', '2', 'N/A'],
                     ['D/ST', '1', '3'],
                     ['Kicker', '1', '3'],
                   ].map(([pos, starters, max]) => (
