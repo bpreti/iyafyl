@@ -38,12 +38,12 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ slu
   const team = await getTeamBySlug(slug)
   if (!team) notFound()
 
-  const [names, { teamSeasons, playoffResults }] = await Promise.all([
+  const [names, { teamSeasons, playoffResults, games }] = await Promise.all([
     getTeamNamesForTeam(team.id),
     getTeamDetailData(team.id),
   ])
 
-  const career = computeCareerStats(team.id, teamSeasons, playoffResults)
+  const career = computeCareerStats(team.id, teamSeasons, playoffResults, games)
 
   const currentName = names.find(n => n.end_year === null)?.name ?? names[names.length - 1]?.name ?? team.owner_name
   const previousNames = names.filter(n => n.end_year !== null)
