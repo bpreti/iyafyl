@@ -1,4 +1,4 @@
-import type { Game, Season, TeamWithCurrentName, TeamName, TeamSeasonRow } from '@/types'
+import type { Game, Season, TeamWithCurrentName, TeamName, TeamSeasonRow, PlayoffResultRow } from '@/types'
 
 // ── Shared helper ─────────────────────────────────────────────────────────────
 
