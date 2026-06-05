@@ -3,15 +3,7 @@
 import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronUp, BarChart2, Calendar } from 'lucide-react'
 import type { Game, Season, TeamWithCurrentName, TeamName } from '@/types'
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function getTeamNameForYear(teamId: number, year: number, teamNames: TeamName[]): string {
-  const match = teamNames.find(
-    n => n.team_id === teamId && n.start_year <= year && (n.end_year === null || n.end_year >= year)
-  )
-  return match?.name ?? 'Unknown'
-}
+import { getTeamNameForYear } from '@/lib/records'
 
 function getOwnerName(teamId: number, teams: TeamWithCurrentName[]): string {
   return teams.find(t => t.id === teamId)?.owner_name ?? ''
