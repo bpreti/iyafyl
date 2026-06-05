@@ -23,16 +23,38 @@ function playoffRoundLabel(round: string, totalRounds: number): string {
 
 // ── Season Stats ─────────────────────────────────────────────────────────────
 
+export interface AllTimeGameRecords {
+  highScore: number
+  lowScore: number
+  avgScore: number
+  biggestBlowout: number
+  closestGame: number
+  highCombined: number
+}
+
+function RecordBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-full"
+      style={{ background: 'rgba(234,179,8,0.15)', color: 'var(--gold)', border: '1px solid rgba(234,179,8,0.3)' }}
+    >
+      ⭐ Record
+    </span>
+  )
+}
+
 function SeasonStats({
   games,
   year,
   teams,
   teamNames,
+  allTimeRecords,
 }: {
   games: Game[]
   year: number
   teams: TeamWithCurrentName[]
   teamNames: TeamName[]
+  allTimeRecords?: AllTimeGameRecords
 }) {
   const regularGames = games.filter(g => !g.is_playoff)
 
@@ -61,11 +83,14 @@ function SeasonStats({
   const totalScored = allScores.reduce((sum, s) => sum + s.score, 0)
   const avgScore = (totalScored / allScores.length).toFixed(2)
 
-  const stat = (label: string, value: string, sub: string) => (
+  const r = allTimeRecords
+
+  const stat = (label: string, value: string, sub: string, isRecord: boolean) => (
     <div className="rounded-xl p-4 space-y-1" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
       <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>{label}</p>
       <p className="text-xl font-bold" style={{ color: 'var(--accent-light)' }}>{value}</p>
       <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{sub}</p>
+      {isRecord && <RecordBadge />}
     </div>
   )
 
@@ -76,15 +101,21 @@ function SeasonStats({
         <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Season Stats</h3>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {stat('High Score', fmtScore(String(highScore.score)), getTeamNameForYear(highScore.teamId, year, teamNames))}
-        {stat('Low Score',  fmtScore(String(lowScore.score)),  getTeamNameForYear(lowScore.teamId, year, teamNames))}
-        {stat('Avg Score',  avgScore, 'per team per game')}
+        {stat('High Score', fmtScore(String(highScore.score)), getTeamNameForYear(highScore.teamId, year, teamNames),
+          !!r && highScore.score >= r.highScore)}
+        {stat('Low Score',  fmtScore(String(lowScore.score)),  getTeamNameForYear(lowScore.teamId, year, teamNames),
+          !!r && lowScore.score <= r.lowScore)}
+        {stat('Avg Score',  avgScore, 'per team per game',
+          !!r && Math.round(Number(avgScore) * 100) >= Math.round(r.avgScore * 100))}
         {stat('Closest Game', fmtScore(closestGame.diff.toString()),
-          `${getTeamNameForYear(closestGame.game.home_team_id, year, teamNames)} vs ${getTeamNameForYear(closestGame.game.away_team_id, year, teamNames)}`)}
+          `${getTeamNameForYear(closestGame.game.home_team_id, year, teamNames)} vs ${getTeamNameForYear(closestGame.game.away_team_id, year, teamNames)}`,
+          !!r && Math.round(closestGame.diff * 100) <= Math.round(r.closestGame * 100))}
         {stat('Biggest Blowout', fmtScore(biggestBlowout.diff.toString()),
-          `${getTeamNameForYear(biggestBlowout.game.home_team_id, year, teamNames)} vs ${getTeamNameForYear(biggestBlowout.game.away_team_id, year, teamNames)}`)}
+          `${getTeamNameForYear(biggestBlowout.game.home_team_id, year, teamNames)} vs ${getTeamNameForYear(biggestBlowout.game.away_team_id, year, teamNames)}`,
+          !!r && Math.round(biggestBlowout.diff * 100) >= Math.round(r.biggestBlowout * 100))}
         {stat('High Combined', fmtScore(highestCombined.combined_points),
-          `${getTeamNameForYear(highestCombined.home_team_id, year, teamNames)} vs ${getTeamNameForYear(highestCombined.away_team_id, year, teamNames)}`)}
+          `${getTeamNameForYear(highestCombined.home_team_id, year, teamNames)} vs ${getTeamNameForYear(highestCombined.away_team_id, year, teamNames)}`,
+          !!r && Math.round(Number(highestCombined.combined_points) * 100) >= Math.round(r.highCombined * 100))}
       </div>
     </div>
   )
@@ -248,9 +279,10 @@ interface SeasonSectionProps {
   teams: TeamWithCurrentName[]
   teamNames: TeamName[]
   playoffResults: PlayoffResultRow[]
+  allTimeRecords?: AllTimeGameRecords
 }
 
-export default function SeasonSection({ season, games, teams, teamNames, playoffResults }: SeasonSectionProps) {
+export default function SeasonSection({ season, games, teams, teamNames, playoffResults, allTimeRecords }: SeasonSectionProps) {
   const [selectedTeams, setSelectedTeams] = useState<number[]>([])
   const [showSchedule, setShowSchedule] = useState(false)
 
@@ -320,7 +352,7 @@ export default function SeasonSection({ season, games, teams, teamNames, playoff
 
   return (
     <div className="space-y-6 pt-2">
-      <SeasonStats games={games} year={season.year} teams={teams} teamNames={teamNames} />
+      <SeasonStats games={games} year={season.year} teams={teams} teamNames={teamNames} allTimeRecords={allTimeRecords} />
 
       {/* Schedule toggle */}
       <div>

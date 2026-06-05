@@ -2,7 +2,9 @@ import { Metadata } from 'next'
 import Link from 'next/link'
 import { FileText } from 'lucide-react'
 import { getTeams, getSeasons, getPlayoffResults, getSeasonAwards, getAllGames, getAllTeamNames, getTeamCurrentName } from '@/lib/queries'
-import SeasonSection from '@/components/SeasonSection'
+import SeasonSection, { type AllTimeGameRecords } from '@/components/SeasonSection'
+import NotableStats from '@/components/NotableStats'
+import { NOTABLE_STATS } from '@/lib/notableStats'
 
 export const metadata: Metadata = { title: 'History' }
 
@@ -17,6 +19,26 @@ export default async function HistoryPage() {
   ])
 
   const sortedSeasons = [...seasons].sort((a, b) => b.year - a.year)
+
+  // Compute all-time game records from regular season games
+  const regGames = allGames.filter(g => !g.is_playoff)
+  const allScores = regGames.flatMap(g => [Number(g.home_score), Number(g.away_score)])
+
+  // Compute per-season avg scores to find the all-time best
+  const seasonAvgScores = seasons.map(s => {
+    const sg = regGames.filter(g => g.season_id === s.id)
+    const scores = sg.flatMap(g => [Number(g.home_score), Number(g.away_score)])
+    return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+  })
+
+  const allTimeGameRecords: AllTimeGameRecords = {
+    highScore:       Math.max(...allScores),
+    lowScore:        Math.min(...allScores),
+    avgScore:        Math.max(...seasonAvgScores),
+    biggestBlowout:  Math.max(...regGames.map(g => Number(g.point_difference))),
+    closestGame:     Math.min(...regGames.map(g => Number(g.point_difference))),
+    highCombined:    Math.max(...regGames.map(g => Number(g.combined_points))),
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-4">
@@ -107,6 +129,11 @@ export default async function HistoryPage() {
                 <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>Season data coming soon.</p>
               )}
 
+              {(() => {
+                const notable = NOTABLE_STATS.find(s => s.year === season.year)
+                return notable ? <NotableStats stats={notable} /> : null
+              })()}
+
               {seasonGames.length > 0 && (
                 <SeasonSection
                   season={season}
@@ -114,6 +141,7 @@ export default async function HistoryPage() {
                   teams={teams}
                   teamNames={allTeamNames}
                   playoffResults={allResults.filter(pr => pr.season_id === season.id)}
+                  allTimeRecords={allTimeGameRecords}
                 />
               )}
             </div>
