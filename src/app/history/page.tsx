@@ -129,12 +129,13 @@ export default async function HistoryPage() {
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
             The governing rules and regulations of If You Ain&apos;t First You&apos;re Last.
           </p>
-          <button
-            className="mt-2 text-sm font-medium underline-offset-2 hover:underline"
+          <Link
+            href="/constitution"
+            className="mt-2 inline-block text-sm font-medium underline-offset-2 hover:underline"
             style={{ color: 'var(--accent-light)' }}
           >
             View Constitution →
-          </button>
+          </Link>
         </div>
       </div>
 
