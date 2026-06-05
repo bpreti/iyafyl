@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronUp, BarChart2, Calendar } from 'lucide-react'
-import type { Game, Season, TeamWithCurrentName, TeamName } from '@/types'
+import type { Game, Season, TeamWithCurrentName, TeamName, PlayoffResultRow } from '@/types'
 import { getTeamNameForYear } from '@/lib/records'
 
 function getOwnerName(teamId: number, teams: TeamWithCurrentName[]): string {
@@ -90,6 +90,36 @@ function SeasonStats({
   )
 }
 
+// ── Position label helpers ────────────────────────────────────────────────────
+
+import type { PlayoffResultType } from '@/types'
+
+const WINNERS_POSITION: Partial<Record<PlayoffResultType, string>> = {
+  champion:  '🏆 Championship',
+  runner_up: '🏆 Championship',
+  third:     '🥉 3rd Place',
+  fourth:    '🥉 3rd Place',
+  fifth:     '5th Place',
+  sixth:     '5th Place',
+}
+
+const SUCKO_POSITION: Partial<Record<PlayoffResultType, string>> = {
+  sucko_winner:    '💀 Sucko Championship',
+  sucko_runner_up: '💀 Sucko Championship',
+}
+
+function getPositionLabel(
+  game: Game,
+  playoffResults: PlayoffResultRow[],
+  bracket: 'winners' | 'sucko'
+): string | null {
+  const lookup = bracket === 'winners' ? WINNERS_POSITION : SUCKO_POSITION
+  const homeResult = playoffResults.find(pr => pr.team_id === game.home_team_id && pr.bracket === bracket)?.result
+  const awayResult = playoffResults.find(pr => pr.team_id === game.away_team_id && pr.bracket === bracket)?.result
+  if (!homeResult || !awayResult) return null
+  return lookup[homeResult] ?? null
+}
+
 // ── Game Row ─────────────────────────────────────────────────────────────────
 
 function GameRow({
@@ -97,11 +127,13 @@ function GameRow({
   year,
   teams,
   teamNames,
+  positionLabel,
 }: {
   game: Game
   year: number
   teams: TeamWithCurrentName[]
   teamNames: TeamName[]
+  positionLabel?: string | null
 }) {
   const homeScore = Number(game.home_score)
   const awayScore = Number(game.away_score)
@@ -114,7 +146,16 @@ function GameRow({
   const loserStyle  = { color: 'var(--text-secondary)' }
 
   return (
-    <div className="flex items-center gap-2 py-2 px-3 rounded-lg text-sm" style={{ borderBottom: '1px solid var(--border)' }}>
+    <div className="flex items-center gap-2 py-2 px-3 text-sm" style={{ borderBottom: '1px solid var(--border)' }}>
+      {/* Position label */}
+      {positionLabel !== undefined && (
+        <span
+          className="shrink-0 text-xs font-semibold w-36 hidden sm:block"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          {positionLabel ?? ''}
+        </span>
+      )}
       {/* Away team */}
       <span className="flex-1 min-w-0 truncate text-right" style={homeWon ? loserStyle : winnerStyle}>
         {awayName}
@@ -162,6 +203,7 @@ function WeekBlock({
   teams,
   teamNames,
   variant = 'regular',
+  playoffResults,
 }: {
   label: string
   games: Game[]
@@ -169,8 +211,10 @@ function WeekBlock({
   teams: TeamWithCurrentName[]
   teamNames: TeamName[]
   variant?: 'regular' | 'winners' | 'sucko'
+  playoffResults?: PlayoffResultRow[]
 }) {
   const s = blockStyles[variant]
+  const bracket = variant === 'sucko' ? 'sucko' : 'winners'
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
       <div className="px-3 py-2 flex items-center gap-2" style={s.header}>
@@ -182,7 +226,14 @@ function WeekBlock({
       </div>
       <div>
         {games.map(g => (
-          <GameRow key={g.id} game={g} year={year} teams={teams} teamNames={teamNames} />
+          <GameRow
+            key={g.id}
+            game={g}
+            year={year}
+            teams={teams}
+            teamNames={teamNames}
+            positionLabel={playoffResults ? getPositionLabel(g, playoffResults, bracket) : undefined}
+          />
         ))}
       </div>
     </div>
@@ -196,9 +247,10 @@ interface SeasonSectionProps {
   games: Game[]
   teams: TeamWithCurrentName[]
   teamNames: TeamName[]
+  playoffResults: PlayoffResultRow[]
 }
 
-export default function SeasonSection({ season, games, teams, teamNames }: SeasonSectionProps) {
+export default function SeasonSection({ season, games, teams, teamNames, playoffResults }: SeasonSectionProps) {
   const [selectedTeams, setSelectedTeams] = useState<number[]>([])
   const [showSchedule, setShowSchedule] = useState(false)
 
@@ -250,6 +302,16 @@ export default function SeasonSection({ season, games, teams, teamNames }: Seaso
   const totalSuckoRounds = useMemo(() =>
     new Set(games.filter(g => g.is_playoff && g.bracket === 'sucko').map(g => g.playoff_round)).size
   , [games])
+
+  // Final round key per bracket (for showing position labels)
+  const winnersFinalRound = useMemo(() => {
+    const rounds = games.filter(g => g.is_playoff && g.bracket !== 'sucko').map(g => g.playoff_round ?? '').filter(Boolean)
+    return rounds.length ? [...rounds].sort().at(-1)! : null
+  }, [games])
+  const suckoFinalRound = useMemo(() => {
+    const rounds = games.filter(g => g.is_playoff && g.bracket === 'sucko').map(g => g.playoff_round ?? '').filter(Boolean)
+    return rounds.length ? [...rounds].sort().at(-1)! : null
+  }, [games])
 
   const toggleTeam = (id: number) =>
     setSelectedTeams(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -353,6 +415,7 @@ export default function SeasonSection({ season, games, teams, teamNames }: Seaso
                         teams={teams}
                         teamNames={teamNames}
                         variant="winners"
+                        playoffResults={round === winnersFinalRound ? playoffResults : undefined}
                       />
                     ))}
                 </div>
@@ -375,6 +438,7 @@ export default function SeasonSection({ season, games, teams, teamNames }: Seaso
                         teams={teams}
                         teamNames={teamNames}
                         variant="sucko"
+                        playoffResults={round === suckoFinalRound ? playoffResults : undefined}
                       />
                     ))}
                 </div>
