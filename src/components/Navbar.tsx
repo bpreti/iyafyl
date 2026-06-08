@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import { Trophy } from 'lucide-react'
 
 const navLinks = [
-  { href: '/',                      label: 'Home' },
   { href: '/teams',                 label: 'Teams' },
   { href: '/regular-season-stats',  label: 'Regular Season' },
   { href: '/playoff-stats',         label: 'Playoffs' },
